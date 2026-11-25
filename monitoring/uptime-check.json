@@ -1,0 +1,19 @@
+{
+  "displayName": "rami-api liveness",
+  "monitoredResource": {
+    "type": "uptime_url",
+    "labels": {
+      "project_id": "PROJECT_ID",
+      "host": "API_HOST"
+    }
+  },
+  "httpCheck": {
+    "path": "/api/v1/health/live",
+    "port": 443,
+    "useSsl": true,
+    "requestMethod": "GET"
+  },
+  "period": "60s",
+  "timeout": "10s",
+  "selectedRegions": ["USA", "EUROPE", "ASIA_PACIFIC"]
+}

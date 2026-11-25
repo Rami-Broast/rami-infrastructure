@@ -1,0 +1,5 @@
+# Copy to terraform.tfvars (git-ignored) and fill in. No secrets here — only
+# project/region/env. Secret VALUES are added with scripts/setup-secrets.sh.
+project_id = "rami-broast"
+region     = "me-central2"
+env        = "staging"

@@ -1,0 +1,53 @@
+# CI/CD: deploy the backend to Cloud Run on push to main.
+#
+# TEMPLATE — lives here as reference. To use it, copy into the BACKEND repo at
+# .github/workflows/deploy.yml (it needs the backend source in the same repo).
+#
+# Auth uses Workload Identity Federation (no long-lived JSON key committed).
+# One-time setup: https://github.com/google-github-actions/auth#setup
+# Set these repo secrets/vars first:
+#   vars.GCP_PROJECT_ID, vars.GCP_REGION, vars.CLOUDSQL_CONN, vars.CLIENT_ORIGINS
+#   secrets.GCP_WORKLOAD_IDENTITY_PROVIDER, secrets.GCP_DEPLOY_SA_EMAIL
+
+name: Deploy backend (Cloud Run)
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write   # required for Workload Identity Federation
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SA_EMAIL }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # Apply any new Prisma migrations before rolling out new code.
+      # Runs as a one-off Cloud Run job with the same image build.
+      - name: Deploy service
+        run: |
+          gcloud run deploy rami-api \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region "${{ vars.GCP_REGION }}" \
+            --source . \
+            --platform managed \
+            --add-cloudsql-instances "${{ vars.CLOUDSQL_CONN }}" \
+            --allow-unauthenticated \
+            --port 3000 \
+            --set-env-vars "NODE_ENV=production,LOG_LEVEL=info,LOG_PRETTY=false,SWAGGER_ENABLED=false,TRUSTED_PROXY_HOPS=1,PAYMENT_GATEWAY=mock,PAYMENT_SANDBOX=true,SMS_PROVIDER=mock,PUSH_PROVIDER=mock,VAT_STANDARD_RATE=0.15,PRICES_INCLUDE_VAT=true,DELIVERY_FEE_TAXABLE=true,LOYALTY_POINTS_PER_SAR=1,CORS_ALLOWED_ORIGINS=${{ vars.CLIENT_ORIGINS }}" \
+            --set-secrets "DATABASE_URL=DATABASE_URL:latest,JWT_ACCESS_SECRET=JWT_ACCESS_SECRET:latest,PAYMENT_MOCK_WEBHOOK_SECRET=PAYMENT_MOCK_WEBHOOK_SECRET:latest"
+
+  # NOTE: run `prisma migrate deploy` against Cloud SQL (via the Auth Proxy or a
+  # Cloud Run Job) as a step BEFORE promoting traffic in a real pipeline. See
+  # docs/deploy-backend-gcp.md step 3.

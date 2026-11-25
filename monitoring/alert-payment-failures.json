@@ -1,0 +1,29 @@
+{
+  "displayName": "rami-api payment/webhook failures",
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Payment or webhook failures logged",
+      "conditionThreshold": {
+        "filter": "resource.type = \"cloud_run_revision\" AND metric.type = \"logging.googleapis.com/user/rami_payment_webhook_failures\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_DELTA",
+            "crossSeriesReducer": "REDUCE_SUM"
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 0,
+        "duration": "0s",
+        "trigger": { "count": 1 }
+      }
+    }
+  ],
+  "alertStrategy": { "autoClose": "3600s" },
+  "notificationChannels": ["NOTIFICATION_CHANNEL"],
+  "documentation": {
+    "content": "A payment- or webhook-processing failure was logged. Money paths are idempotent and client success is never proof of payment, so a single failure is not customer-visible loss — but investigate: check the PaymentWebhookEvent rows (signatureVerified, processingStatus) and the failing correlation id in logs. Never log or paste raw gateway credentials. Runbook: docs/monitoring.md.",
+    "mimeType": "text/markdown"
+  }
+}

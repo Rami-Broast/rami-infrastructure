@@ -1,0 +1,28 @@
+{
+  "displayName": "rami-api high request latency (p95)",
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "p95 request latency > 1500ms for 5 min",
+      "conditionThreshold": {
+        "filter": "resource.type = \"cloud_run_revision\" AND resource.labels.service_name = \"rami-api\" AND metric.type = \"run.googleapis.com/request_latencies\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "60s",
+            "perSeriesAligner": "ALIGN_PERCENTILE_95"
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 1500,
+        "duration": "300s",
+        "trigger": { "count": 1 }
+      }
+    }
+  ],
+  "alertStrategy": { "autoClose": "1800s" },
+  "notificationChannels": ["NOTIFICATION_CHANNEL"],
+  "documentation": {
+    "content": "rami-api p95 latency is high. Check Cloud SQL CPU/connections, cold starts (min instances), and slow queries. Runbook: docs/monitoring.md.",
+    "mimeType": "text/markdown"
+  }
+}
