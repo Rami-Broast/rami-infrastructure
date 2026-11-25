@@ -1,0 +1,10 @@
+{
+  "name": "rami_payment_webhook_failures",
+  "description": "Count of payment- or webhook-processing failures logged by rami-api. Tune the filter to the backend's actual log fields before relying on it (pino structured logs; the redaction list in backend/src/logger keeps secrets out).",
+  "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"rami-api\" AND severity>=ERROR AND (textPayload:(\"payment\" OR \"webhook\" OR \"refund\") OR jsonPayload.context=~\"Payment|Webhook|Refund\")",
+  "metricDescriptor": {
+    "metricKind": "DELTA",
+    "valueType": "INT64",
+    "unit": "1"
+  }
+}

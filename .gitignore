@@ -1,0 +1,13 @@
+# Never commit real secret values or local state.
+*.env
+!*.env.example
+*-secrets.env
+backups/
+*.dump
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/terraform.tfvars
+terraform/.terraform.lock.hcl

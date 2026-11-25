@@ -1,0 +1,28 @@
+{
+  "displayName": "rami-api down (uptime check failing)",
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Liveness uptime check failing",
+      "conditionThreshold": {
+        "filter": "resource.type = \"uptime_url\" AND metric.type = \"monitoring.googleapis.com/uptime_check/check_passed\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_FRACTION_TRUE"
+          }
+        ],
+        "comparison": "COMPARISON_LT",
+        "thresholdValue": 0.5,
+        "duration": "120s",
+        "trigger": { "count": 1 }
+      }
+    }
+  ],
+  "alertStrategy": { "autoClose": "1800s" },
+  "notificationChannels": ["NOTIFICATION_CHANNEL"],
+  "documentation": {
+    "content": "The API liveness probe (/api/v1/health/live) is failing from multiple regions. Check Cloud Run service health, recent deploys, and Cloud SQL availability. Runbook: docs/monitoring.md.",
+    "mimeType": "text/markdown"
+  }
+}

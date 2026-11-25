@@ -1,0 +1,67 @@
+# CI/CD: deploy the backend to the STAGING Cloud Run service on push to main.
+#
+# TEMPLATE — copy into the BACKEND repo at .github/workflows/deploy-staging.yml.
+# Runs BEFORE production: main → staging automatically; production is a manual
+# promote (see deploy-backend-cloudrun.yml). Staging has its own Cloud SQL
+# instance and its own …_STAGING secrets — it never touches production data.
+#
+# Repo secrets/vars (staging-scoped):
+#   vars.GCP_PROJECT_ID, vars.GCP_REGION, vars.CLOUDSQL_CONN_STAGING,
+#   vars.CLIENT_ORIGINS_STAGING
+#   secrets.GCP_WORKLOAD_IDENTITY_PROVIDER, secrets.GCP_DEPLOY_SA_EMAIL
+
+name: Deploy backend (staging)
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SA_EMAIL }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # Apply pending migrations against the STAGING database before rollout.
+      # Runs as a one-off Cloud Run Job using the same source build. See
+      # infrastructure/docs/staging.md.
+      - name: Migrate staging database
+        run: |
+          gcloud run jobs deploy rami-migrate-staging \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region "${{ vars.GCP_REGION }}" \
+            --source . \
+            --add-cloudsql-instances "${{ vars.CLOUDSQL_CONN_STAGING }}" \
+            --set-secrets "DATABASE_URL=DATABASE_URL_STAGING:latest" \
+            --command "npx" \
+            --args "prisma,migrate,deploy" \
+            --max-retries 1 --task-timeout 600s
+          gcloud run jobs execute rami-migrate-staging \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region "${{ vars.GCP_REGION }}" --wait
+
+      - name: Deploy staging service
+        run: |
+          gcloud run deploy rami-api-staging \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region "${{ vars.GCP_REGION }}" \
+            --source . \
+            --platform managed \
+            --add-cloudsql-instances "${{ vars.CLOUDSQL_CONN_STAGING }}" \
+            --allow-unauthenticated \
+            --port 3000 \
+            --set-env-vars "NODE_ENV=production,LOG_LEVEL=debug,LOG_PRETTY=false,SWAGGER_ENABLED=true,TRUSTED_PROXY_HOPS=1,PAYMENT_GATEWAY=mock,PAYMENT_SANDBOX=true,SMS_PROVIDER=mock,PUSH_PROVIDER=mock,VAT_STANDARD_RATE=0.15,PRICES_INCLUDE_VAT=true,DELIVERY_FEE_TAXABLE=true,LOYALTY_POINTS_PER_SAR=1,OTP_DEMO_FIXED_CODE=123456,CORS_ALLOWED_ORIGINS=${{ vars.CLIENT_ORIGINS_STAGING }}" \
+            --set-secrets "DATABASE_URL=DATABASE_URL_STAGING:latest,JWT_ACCESS_SECRET=JWT_ACCESS_SECRET_STAGING:latest,PAYMENT_MOCK_WEBHOOK_SECRET=PAYMENT_MOCK_WEBHOOK_SECRET_STAGING:latest"
